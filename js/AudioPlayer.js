@@ -246,8 +246,7 @@ var AudioPlayer = (function() {
       evt.preventDefault();
       if(evt.target.className === 'pl-title') {
         var current = parseInt(evt.target.parentNode.getAttribute('data-track'), 10);
-        index = current;
-        play();
+        play(current);
         plActive();
       }
       else {
@@ -268,7 +267,7 @@ var AudioPlayer = (function() {
             if(!audio.paused) {
 
               if(isDel === index) {
-                play();
+                play(index);
               }
 
             }
@@ -322,10 +321,11 @@ var AudioPlayer = (function() {
   function error() {
     !isEmptyList() && next();
   }
-  function play() {
-
-    index = (index > playList.length - 1) ? 0 : index;
-    if(index < 0) index = playList.length - 1;
+  function play(_index = null) {
+    if (_index !== null) {
+      index = _index
+      audio.src = playList[index].file;
+    }
 
     if(isEmptyList()) {
       empty();
@@ -334,8 +334,6 @@ var AudioPlayer = (function() {
 
     played.push(index)
 
-    audio.src = playList[index].file;
-    audio.preload = 'auto';
     document.title = trackTitle.innerHTML = playList[index].title;
     audio.play();
     notify(playList[index].title, {
@@ -347,16 +345,20 @@ var AudioPlayer = (function() {
   }
 
   function prev() {
+    let current;
+
     if (played.length > 1) {
-      index = played.splice(-2)[0];
+      current = played.splice(-2)[0];
     } else {
-      index = 0;
+      current = 0;
     }
 
-    play();
+    play(current);
   }
 
   function next(interactive) {
+    let current;
+
     if (shuffling) {
       if (shuffling.length === 0) {
 	if (repeating || interactive) {
@@ -369,7 +371,7 @@ var AudioPlayer = (function() {
       }
 
       let i = Math.floor(Math.random() * shuffling.length);
-      index = shuffling.splice(i, 1)[0];
+      current = shuffling.splice(i, 1)[0];
     } else {
       if (index === playList.length - 1 && (!repeating && !interactive)) {
 	audio.pause();
@@ -377,10 +379,10 @@ var AudioPlayer = (function() {
 	return;
       }
 
-      index = (index === playList.length - 1) ? 0 : index + 1;
+      current = (index === playList.length - 1) ? 0 : index + 1;
     }
 
-    play();
+    play(current);
   }
 
   function isEmptyList() {
