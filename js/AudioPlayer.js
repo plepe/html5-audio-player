@@ -78,7 +78,9 @@ var AudioPlayer = (function() {
   durTime,
   trackTitle,
   audio,
+  audioPreload,
   index = 0,
+  indexPreload = null,
   playList,
   volumeBar,
   volumeLength,
@@ -168,8 +170,7 @@ var AudioPlayer = (function() {
     // Create audio object
     audio = new Audio();
     audio.volume = settings.volume;
-
-
+    audioPreload = new Audio();
 
     if(isEmptyList()) {
       empty();
@@ -177,23 +178,27 @@ var AudioPlayer = (function() {
     }
 
     audio.src = playList[index].file;
-    audio.preload = 'auto';
     trackTitle.innerHTML = playList[index].title;
     volumeBar.style.height = audio.volume * 100 + '%';
     volumeLength = volumeBar.css('height');
 
-    audio.addEventListener('error', error, false);
-    audio.addEventListener('timeupdate', update, false);
-    audio.addEventListener('ended', doEnd, false);
-    audio.addEventListener('play', () => {
-      playBtn.classList.add('playing');
-    }, false)
-    audio.addEventListener('pause', () => {
-      playBtn.classList.remove('playing');
-    }, false)
+    [audio, audioPreload].forEach(audio => {
+      audio.preload = 'auto';
+      audio.addEventListener('error', error, false);
+      audio.addEventListener('timeupdate', update, false);
+      audio.addEventListener('ended', doEnd, false);
+      audio.addEventListener('loadedmetadata', () => console.log('loaded', audio), false);
+      audio.addEventListener('play', () => {
+	playBtn.classList.add('playing');
+      }, false)
+      audio.addEventListener('pause', () => {
+	playBtn.classList.remove('playing');
+      }, false)
+    })
 
     if(settings.autoPlay) {
       audio.play();
+      preloadNext();
       plLi[index].classList.add('pl-current');
     }
   }
@@ -324,7 +329,20 @@ var AudioPlayer = (function() {
   function play(_index = null) {
     if (_index !== null) {
       index = _index
-      audio.src = playList[index].file;
+
+      if (index === indexPreload) {
+	audio.pause();
+	audioPreload.volume = audio.volume;
+
+	index = indexPreload;
+	indexPreload = null;
+
+	let h = audio;
+	audio = audioPreload;
+	audioPreload = h;
+      } else {
+	audio.src = playList[index].file;
+      }
     }
 
     if(isEmptyList()) {
@@ -342,6 +360,8 @@ var AudioPlayer = (function() {
       tag: 'music-player'
     });
     plActive();
+
+    preloadNext();
   }
 
   function prev() {
@@ -356,8 +376,8 @@ var AudioPlayer = (function() {
     play(current);
   }
 
-  function next(interactive) {
-    let current;
+  function preloadNext(interactive) {
+    indexPreload = null;
 
     if (shuffling) {
       if (shuffling.length === 0) {
@@ -371,7 +391,7 @@ var AudioPlayer = (function() {
       }
 
       let i = Math.floor(Math.random() * shuffling.length);
-      current = shuffling.splice(i, 1)[0];
+      indexPreload = shuffling.splice(i, 1)[0];
     } else {
       if (index === playList.length - 1 && (!repeating && !interactive)) {
 	audio.pause();
@@ -379,10 +399,21 @@ var AudioPlayer = (function() {
 	return;
       }
 
-      current = (index === playList.length - 1) ? 0 : index + 1;
+      indexPreload = (index === playList.length - 1) ? 0 : index + 1;
     }
 
-    play(current);
+    audioPreload.src = playList[indexPreload].file;
+    audioPreload.preload = 'auto';
+  }
+
+  function next(interactive) {
+    if (!indexPreload) {
+      preloadNext(interactive);
+    }
+
+    if (indexPreload) {
+      play(indexPreload);
+    }
   }
 
   function isEmptyList() {
@@ -460,6 +491,8 @@ var AudioPlayer = (function() {
       shuffling = [...Array(playList.length).keys()]
       shuffle.add('ap-active');
     }
+
+    preloadNext();
   }
 
   function plToggle() {
